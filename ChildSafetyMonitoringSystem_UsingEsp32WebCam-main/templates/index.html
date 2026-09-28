@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Safety Dashboard v2.1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-red { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 50% { opacity: 0.8; box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
+        .animate-pulse-red { animation: pulse-red 2s infinite; }
+        #alert-log::-webkit-scrollbar { width: 8px; }
+        #alert-log::-webkit-scrollbar-track { background: #374151; } /* gray-700 */
+        #alert-log::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 4px; } /* gray-500 */
+        #alert-log::-webkit-scrollbar-thumb:hover { background: #9ca3af; } /* gray-400 */
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased font-sans">
+
+    <header class="bg-gray-800 shadow-md sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-white flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2 text-blue-400">
+                  <path fill-rule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.5 13c1.155 2-.288 4.5-2.598 4.5H4.499c-2.31 0-3.753-2.5-2.598-4.5l7.5-13Zm-2.68 9.69a.75.75 0 0 0-1.442-.41l-2.25 3.9a.75.75 0 1 0 1.299.75l2.25-3.9a.75.75 0 0 0-.177-.84Zm2.04-1.38a.75.75 0 0 1 .75-.75h2.998a.75.75 0 1 1 0 1.5H9.51a.75.75 0 0 1-.75-.75Zm-.71 3.02a.75.75 0 1 1 .01-1.5l.004-.001a.75.75 0 0 1-.01 1.5l-.004.001ZM12 1.5a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 12 1.5Z" clip-rule="evenodd" />
+                </svg>
+                AI Child Safety Monitor
+            </h1>
+            <div id="fps-display" class="text-sm text-gray-400 font-mono">FPS: --</div>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700">
+                <div class="p-3 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2"> <path d="M3.25 4A2.25 2.25 0 0 0 1 6.25v7.5A2.25 2.25 0 0 0 3.25 16h7.5A2.25 2.25 0 0 0 13 13.75v-7.5A2.25 2.25 0 0 0 10.75 4h-7.5ZM19 4.75a.75.75 0 0 0-1.28-.53l-3 3a.75.75 0 0 0-.22.53v4.5c0 .199.079.39.22.53l3 3a.75.75 0 0 0 1.28-.53V4.75Z" /></svg>
+                        Live Feed
+                    </h2>
+                    <span id="status-badge" class="px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider shadow bg-gray-600">Connecting...</span>
+                </div>
+                <div class="relative bg-black aspect-video"> {/* Maintain aspect ratio */}
+                    <img id="video-stream" src="/video_feed" alt="Video Stream Paused or Loading..." class="w-full h-full object-contain" onerror="this.alt='❌ Error loading video stream. Check connection or app logs.'; this.style.display='none'; document.getElementById('paused-overlay').style.display='flex'; document.getElementById('paused-overlay-text').textContent='STREAM ERROR';">
+                    <div id="paused-overlay" class="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+                        <h3 id="paused-overlay-text" class="text-2xl font-bold text-white opacity-80">STREAM PAUSED</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+                 <div class="p-3 border-b border-gray-700"><h2 class="text-lg font-semibold">Controls</h2></div>
+                <div class="p-4 flex flex-wrap gap-3">
+                    <button id="mute-toggle" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center transition-colors">
+                        <svg id="mute-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1"><path d="M7.168 3.612A4.25 4.25 0 0 0 3.75 7v5.378A4.25 4.25 0 0 0 7.75 16h.5c.46 0 .91-.06 1.34-.176l.16-.051 4.566 2.019a.75.75 0 0 0 1.127-.57v-3.418a4.238 4.238 0 0 0 1.306-2.906V7a4.25 4.25 0 0 0-4.25-4.25h-3.97Z" /></svg>
+                        <svg id="unmute-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1 hidden"><path d="M12.06 9.47a.75.75 0 0 1 1.06 0L14.47 10.82a.75.75 0 0 1 0 1.06l-1.35 1.35a.75.75 0 1 1-1.06-1.06l.78-.78-.78-.78a.75.75 0 0 1 0-1.06ZM17.14 11.36a.75.75 0 0 1 0 1.06l-.78.78.78.78a.75.75 0 1 1-1.06 1.06l-1.35-1.35a.75.75 0 0 1 0-1.06l1.35-1.35a.75.75 0 0 1 1.06 0ZM7.168 3.612A4.25 4.25 0 0 0 3.75 7v5.378A4.25 4.25 0 0 0 7.75 16h.5c.46 0 .91-.06 1.34-.176l.16-.051 4.566 2.019a.75.75 0 0 0 1.127-.57V9.792a4.239 4.239 0 0 0-.694-2.256l-5.698-5.698A4.25 4.25 0 0 0 7.168 3.612Z" /></svg>
+                        <span id="mute-text">Mute Alarm</span>
+                    </button>
+                    <button id="pause-toggle" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center transition-colors">
+                       <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1"><path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm5-2.25A.75.75 0 0 1 7.75 7h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Zm4 0a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75v-4.5Z" clip-rule="evenodd" /></svg>
+                       <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1 hidden"><path fill-rule="evenodd" d="M2 10a8 8 0 1 1 16 0 8 8 0 0 1-16 0Zm6.39-2.908a.75.75 0 0 1 .766.016l3.75 2.25a.75.75 0 0 1 0 1.272l-3.75 2.25A.75.75 0 0 1 8 12.25v-4.5a.75.75 0 0 1 .39-.658Z" clip-rule="evenodd" /></svg>
+                       <span id="pause-text">Pause Stream</span>
+                    </button>
+                </div>
+            </div>
+             <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+                 <div class="p-3 border-b border-gray-700"><h2 class="text-lg font-semibold">AI Model Status</h2></div>
+                <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
+                    <div>Object/Track (YOLO): <span id="model-yolo" class="font-bold text-gray-500">INIT</span></div>
+                    <div>Age Model (Local): <span id="model-age" class="font-bold text-gray-500">INIT</span></div>
+                    <div>Emotion Model (Local): <span id="model-emotion" class="font-bold text-gray-500">INIT</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+                 <div class="p-3 border-b border-gray-700"><h2 class="text-lg font-semibold">Risk Analysis</h2></div>
+                <div class="p-6 flex flex-col items-center justify-center space-y-2 min-h-[150px]">
+                    <div id="risk-score" class="text-7xl font-bold text-gray-500 transition-colors duration-500">--%</div>
+                    <div id="risk-status" class="text-xl font-medium text-gray-400 text-center">Initializing...</div>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col max-h-[500px]">
+                 <div class="p-3 border-b border-gray-700"><h2 class="text-lg font-semibold">Alert Log</h2></div>
+                <div class="p-4 flex-grow overflow-y-auto" id="alert-log-container">
+                    <ul id="alert-log" class="space-y-3">
+                        <li class="text-gray-500 text-sm italic p-2">Waiting for alerts...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="alarm-sound" src="/static/alarm.mp3" preload="auto" loop></audio>
+
+    <script>
+        // --- State Variables ---
+        let isMuted = false;
+        let isPaused = false;
+        let isAlarmPlaying = false;
+        let updateInterval;
+        let lastStreamSrc = "/video_feed";
+
+        // --- DOM Elements ---
+        const alarmSound = document.getElementById('alarm-sound');
+        const muteBtn = document.getElementById('mute-toggle');
+        const pauseBtn = document.getElementById('pause-toggle');
+        const videoStream = document.getElementById('video-stream');
+        const pausedOverlay = document.getElementById('paused-overlay');
+        const pausedOverlayText = document.getElementById('paused-overlay-text');
+        const fpsDisplay = document.getElementById('fps-display');
+        const statusBadge = document.getElementById('status-badge');
+        const riskScoreEl = document.getElementById('risk-score');
+        const riskStatusEl = document.getElementById('risk-status');
+        const alertLogEl = document.getElementById('alert-log');
+        // Corrected IDs for model status
+        const modelYoloEl = document.getElementById('model-yolo');
+        const modelAgeEl = document.getElementById('model-age');
+        const modelEmotionEl = document.getElementById('model-emotion');
+        const muteIcon = document.getElementById('mute-icon');
+        const unmuteIcon = document.getElementById('unmute-icon');
+        const muteText = document.getElementById('mute-text');
+        const pauseIcon = document.getElementById('pause-icon');
+        const playIcon = document.getElementById('play-icon');
+        const pauseText = document.getElementById('pause-text');
+
+        // --- Core Function: Fetches and updates UI ---
+        async function updateDashboard() {
+            if (isPaused) return;
+            try {
+                const response = await fetch('/get_status');
+                if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+                const data = await response.json();
+
+                updateBadge(data.is_live, data.status_text);
+                updateRiskPanel(data.risk_level, data.status_text);
+                handleAlarm(data.risk_level);
+                updateAlertLog(data.alert_history);
+                updateModelStatus(data.models_loaded); // Pass the model status object
+                fpsDisplay.textContent = `FPS: ${data.fps.toFixed(1)}`;
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                updateBadge(false, "Error");
+                updateRiskPanel(null, "Connection Error");
+                handleAlarm(0);
+                updateModelStatus(null);
+                fpsDisplay.textContent = 'FPS: --';
+            }
+        }
+
+        // --- UI Update Functions ---
+        function updateBadge(isLive, statusText) {
+            statusBadge.classList.remove('animate-pulse-red', 'bg-red-600', 'bg-green-600', 'bg-yellow-500', 'bg-gray-500', 'bg-gray-600');
+            statusText = statusText || "Unknown";
+            if (!isLive) {
+                if (statusText === "Stream Connect Error" || statusText === "Reconnecting...") {
+                     statusBadge.textContent = "CONNECTING..."; statusBadge.classList.add('bg-yellow-500');
+                } else if (statusText === "AI Model Load Error") {
+                     statusBadge.textContent = "AI ERROR"; statusBadge.classList.add('bg-red-600');
+                }
+                 else {
+                     statusBadge.textContent = "OFFLINE"; statusBadge.classList.add('bg-gray-500');
+                }
+            } else if (statusText.startsWith("CRITICAL")) {
+                statusBadge.textContent = "CRITICAL"; statusBadge.classList.add('bg-red-600', 'animate-pulse-red');
+            } else if (statusText.startsWith("Warning")) {
+                statusBadge.textContent = "WARNING"; statusBadge.classList.add('bg-yellow-500');
+            } else {
+                statusBadge.textContent = "SAFE"; statusBadge.classList.add('bg-green-600');
+            }
+        }
+
+        function updateRiskPanel(riskLevel, statusText) {
+            const displayRisk = (riskLevel !== null && riskLevel !== undefined) ? riskLevel : '--';
+            riskScoreEl.textContent = `${displayRisk}%`;
+            riskStatusEl.textContent = statusText || "Unknown";
+
+            riskScoreEl.classList.remove('text-green-400', 'text-yellow-400', 'text-red-500', 'text-gray-500');
+            if (riskLevel === null || riskLevel === undefined) { riskScoreEl.classList.add('text-gray-500'); }
+            else if (riskLevel > 70) { riskScoreEl.classList.add('text-red-500'); }
+            else if (riskLevel > 40) { riskScoreEl.classList.add('text-yellow-400'); }
+            else { riskScoreEl.classList.add('text-green-400'); }
+        }
+
+        function handleAlarm(riskLevel) {
+            const isCritical = riskLevel !== null && riskLevel !== undefined && riskLevel > 70;
+            const shouldPlay = isCritical && !isMuted;
+
+            if (shouldPlay && (!isAlarmPlaying || alarmSound.paused)) {
+                alarmSound.play().then(() => { isAlarmPlaying = true; })
+                         .catch(e => console.warn("Audio play failed:", e));
+            } else if (!shouldPlay && isAlarmPlaying) {
+                alarmSound.pause(); alarmSound.currentTime = 0; isAlarmPlaying = false;
+            }
+        }
+
+        function updateAlertLog(history) {
+            alertLogEl.innerHTML = ''; // Clear
+            if (!history || history.length === 0) {
+                alertLogEl.innerHTML = '<li class="text-gray-500 text-sm italic p-2">No alerts recorded yet.</li>'; return;
+            }
+            history.forEach(alert => {
+                const li = document.createElement('li');
+                li.className = 'text-sm border-b border-gray-700 pb-2 mb-2 last:border-b-0 last:pb-0 last:mb-0';
+                const isCritical = alert.event.startsWith("CRITICAL");
+                const textColor = isCritical ? 'text-red-400' : 'text-yellow-400';
+                const icon = isCritical ? '❗️' : '⚠️';
+                const statusLabel = isCritical ? 'CRITICAL' : 'WARNING';
+                const detail = alert.event.replace(/^(CRITICAL:|Warning:)\s*/, '');
+
+                li.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-mono text-xs text-gray-400">${alert.time}</span>
+                        <span class="font-semibold ${textColor} flex items-center ${isCritical ? 'animate-pulse' : ''}">${icon} ${statusLabel}</span>
+                    </div>
+                    <div class="text-gray-300">${detail}</div>`;
+                alertLogEl.appendChild(li);
+            });
+            const logContainer = document.getElementById('alert-log-container');
+            logContainer.scrollTop = 0; // Keep latest alert at the top
+        }
+
+        // Updated function to handle the model status object
+         function updateModelStatus(models) {
+            const updateEl = (el, status) => {
+                if (!el) return; // Check if element exists
+                el.textContent = status ? '✅ ON' : '❌ OFF';
+                el.className = `font-bold ${status ? 'text-green-400' : 'text-red-400'}`;
+            };
+             if (models) {
+                updateEl(modelYoloEl, models.yolo); // Use correct ID
+                updateEl(modelAgeEl, models.age);
+                updateEl(modelEmotionEl, models.emotion);
+             } else { // Handle error or initial state
+                updateEl(modelYoloEl, false); updateEl(modelAgeEl, false); updateEl(modelEmotionEl, false);
+                if(modelYoloEl) modelYoloEl.textContent = 'ERR';
+                if(modelAgeEl) modelAgeEl.textContent = 'ERR';
+                if(modelEmotionEl) modelEmotionEl.textContent = 'ERR';
+             }
+        }
+
+        // --- Event Listeners ---
+        muteBtn.addEventListener('click', () => {
+            isMuted = !isMuted;
+            muteText.textContent = isMuted ? 'Unmute Alarm' : 'Mute Alarm';
+            muteIcon.classList.toggle('hidden', isMuted); unmuteIcon.classList.toggle('hidden', !isMuted);
+            muteBtn.classList.toggle('bg-yellow-600', !isMuted); muteBtn.classList.toggle('hover:bg-yellow-700', !isMuted);
+            muteBtn.classList.toggle('bg-gray-600', isMuted); muteBtn.classList.toggle('hover:bg-gray-700', isMuted);
+            if (isMuted) handleAlarm(0);
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseText.textContent = isPaused ? 'Resume Stream' : 'Pause Stream';
+            pauseIcon.classList.toggle('hidden', isPaused); playIcon.classList.toggle('hidden', !isPaused);
+            pauseBtn.classList.toggle('bg-blue-600', !isPaused); pauseBtn.classList.toggle('hover:bg-blue-700', !isPaused);
+            pauseBtn.classList.toggle('bg-green-600', isPaused); pauseBtn.classList.toggle('hover:bg-green-700', isPaused);
+
+            if (isPaused) {
+                lastStreamSrc = videoStream.src; videoStream.src = "";
+                videoStream.style.display='none'; pausedOverlay.style.display='flex';
+                pausedOverlayText.textContent='STREAM PAUSED';
+                clearInterval(updateInterval); updateBadge(false, "Paused"); handleAlarm(0);
+            } else {
+                videoStream.src = lastStreamSrc.split("?")[0] + "?t=" + new Date().getTime(); // Force reload
+                videoStream.style.display='block'; pausedOverlay.style.display='none';
+                updateDashboard();
+                if(updateInterval) clearInterval(updateInterval);
+                updateInterval = setInterval(updateDashboard, 1000);
+            }
+        });
+
+        // --- Initial Load ---
+        function init() {
+             console.log("Initializing Dashboard v2.1...");
+             if(updateInterval) clearInterval(updateInterval);
+             updateDashboard();
+             updateInterval = setInterval(updateDashboard, 1000); // Poll status every second
+
+             const unlockAudio = () => {
+                 if (alarmSound.paused) { alarmSound.play().then(() => alarmSound.pause()).catch(()=>{}); }
+                 document.body.removeEventListener('click', unlockAudio);
+                 document.body.removeEventListener('touchend', unlockAudio);
+             };
+             document.body.addEventListener('click', unlockAudio);
+             document.body.addEventListener('touchend', unlockAudio);
+        }
+        window.onload = init;
+
+    </script>
+</body>
+</html>
